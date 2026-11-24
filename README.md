@@ -53,6 +53,9 @@ The data is included in the repository, so there is nothing to download:
 4. **Features.** 43 features are kept (9 numerical, 34 categorical). `weight` (97 % missing) and three medications that are constant in the training data are dropped.
 5. **Preprocessing pipeline.** Median imputation and standardisation for numerical features; an `Unknown` level and one-hot encoding for categorical features, with rare levels merged.
 6. **Baselines.** A majority-class classifier and a logistic regression with `class_weight="balanced"`.
+7. **Models (week 3).** Tuned logistic regressions (L2, L1), random forest, histogram gradient boosting, and a soft-voting ensemble (L1, forest and boosting). All use the same folds and preprocessing.
+8. **Tuning (week 3).** Nested cross-validation: the fold used to report a score never takes part in choosing its hyperparameters. Forest configurations are compared with 100 trees, and the selected ones are trained with 300.
+9. **Feature selection (week 3).** Filter (mutual information), wrapper (forward selection) and embedded (L1), repeated inside each outer training set.
 
 ### Preventing data leakage
 
@@ -62,11 +65,14 @@ The data is included in the repository, so there is nothing to download:
 | Statistics learned from evaluation data | Imputation, scaling and encoding are refitted inside each training fold |
 | Test set influencing decisions | Feature decisions use training patients only; the test set is reserved for one final evaluation in week 4 |
 | Identifiers or target used as features | `encounter_id`, `patient_nbr` and `readmitted` are excluded |
-| Undetected leak | With shuffled labels, the pipeline falls back to chance (PR-AUC 0.115, ROC-AUC 0.496) |
+| Tuning or feature selection on the evaluated fold | Nested cross-validation; selection is repeated without the outer fold |
+| Undetected leak | With shuffled labels, the week-3 gradient boosting falls back to chance (PR-AUC 0.115, ROC-AUC 0.499), and so does the week-2 baseline (PR-AUC 0.115, ROC-AUC 0.496) |
 
 ## Results so far
 
 5-fold cross-validation on the training patients (79,541 encounters), mean ± standard deviation over folds. The test set has not been evaluated yet.
+
+### Week 2: baselines
 
 | Metric | Majority class | Logistic regression |
 | --- | --- | --- |
@@ -84,6 +90,26 @@ The data is included in the repository, so there is nothing to download:
 - **Previous inpatient visits** have the largest coefficient among the numerical features. This is an association, not a cause.
 
 All metrics are in [baseline_cv_results.csv](Week_2/outputs/baseline_cv_results.csv).
+
+### Week 3: models
+
+| Model | PR-AUC | ROC-AUC | Precision, top 20 % | Recall, top 20 % | PR-AUC gain vs baseline | p (Holm) |
+| --- | --- | --- | --- | --- | --- | --- |
+| **Gradient boosting** | **0.230 ± 0.004** | 0.674 ± 0.008 | **0.227 ± 0.006** | **0.396 ± 0.010** | **+7.0 %** | 0.010 |
+| Soft-voting ensemble | 0.228 ± 0.003 | **0.676 ± 0.008** | 0.224 ± 0.006 | 0.392 ± 0.011 | +6.4 % | 0.007 |
+| Random forest | 0.227 ± 0.005 | 0.673 ± 0.008 | 0.223 ± 0.007 | 0.389 ± 0.012 | +5.7 % | 0.055 |
+| L1 logistic regression (tuned) | 0.215 ± 0.002 | 0.664 ± 0.007 | 0.215 ± 0.004 | 0.376 ± 0.008 | +0.1 % | 1.000 |
+| L2 logistic regression (tuned) | 0.214 ± 0.002 | 0.664 ± 0.007 | 0.215 ± 0.006 | 0.376 ± 0.010 | 0.0 % | 1.000 |
+| Logistic regression (week-2 baseline) | 0.214 ± 0.002 | 0.663 ± 0.007 | 0.215 ± 0.004 | 0.376 ± 0.007 | – | – |
+
+The p-values come from a corrected paired t-test on 5 folds and are only indicative.
+
+- **Gradient boosting is selected.** It beats the baseline on all 5 folds and catches 187 more early readmissions for the same number of flagged encounters (3,606 against 3,419, of 9,098). The gain is real but modest, and the ensemble does not improve on it.
+- **About 8 variables are enough.** With embedded selection, the PR-AUC is 0.225 against 0.230 with all 43, within the tolerance of 0.005 fixed in advance. `number_inpatient` and `discharge_disposition_id` are by far the most important. The wrapper selection is unstable and over-fits.
+- **Errors.** Recall is 98 % for encounters with 3 or more prior inpatient visits, but only 14 % with none. Encounters with no prior visit account for 71 % of the missed cases.
+- **Class weighting.** Without it, boosting ranks slightly better (PR-AUC 0.233) and its probabilities are much better (Brier score 0.096 against 0.214). To be decided in week 4.
+
+Detailed tables are in [Week_3/outputs](Week_3/outputs).
 
 ## Getting started
 
@@ -125,6 +151,8 @@ jupyter lab
 
 Open [week2_data_preparation_baseline.ipynb](Week_2/week2_data_preparation_baseline.ipynb) and run all cells. This overwrites the files in `Week_2/outputs/`.
 
+Then run [week3_model_development.ipynb](Week_3/week3_model_development.ipynb), which reads the files in `Week_2/outputs/`. A full run takes several hours on a laptop. Finished computations are cached in `Week_3/outputs/*.joblib`, so an interrupted run can be resumed. **Delete these files** if the data, the models or the grids change.
+
 ### Reuse the clean dataset
 
 Use the saved `split` and `fold` columns so that every model is compared on the same data. From the repository root:
@@ -153,13 +181,16 @@ X, y, folds = train[features], train["target"], train["fold"]
 ml_project_esilv/
 ├── Week_1/
 │   ├── project_specification.pdf             # Problem, objectives, evaluation plan
-│   └── prompts.md                            # AI prompts (in French)
+│   └── prompts.md                            # AI prompts, weeks 2 and 3 (in French)
 ├── Week_2/
 │   ├── week2_data_preparation_baseline.ipynb # Cleaning, split, baselines, results
 │   └── outputs/
 │       ├── diabetic_clean.csv.gz
 │       ├── feature_config.json
 │       └── baseline_cv_results.csv
+├── Week_3/
+│   ├── week3_model_development.ipynb         # Models, tuning, feature selection, error analysis
+│   └── outputs/                              # Result tables (.csv, .json) and caches (.joblib)
 ├── src/ml_project_esilv/                     # Python package (placeholder)
 ├── diabetic_data.csv                         # Raw data
 ├── IDS_mapping.csv                           # Code descriptions
@@ -174,13 +205,16 @@ ml_project_esilv/
 
 - [x] **Week 1: definition.** Topic, dataset, project specification
 - [x] **Week 2: data and baseline.** Cleaning, patient-level split, baselines
-- [ ] **Week 3: models.** Random forest, gradient boosting, L1 logistic regression, tuning, and filter / wrapper / embedded feature selection
+- [x] **Week 3: models.** Random forest, gradient boosting, L1 logistic regression, tuning, and filter / wrapper / embedded feature selection
 - [ ] **Week 4: final evaluation.** Single test-set evaluation, fairness by age, sex and race, report and presentation
 
 ## Limitations
 
 - The data is old (1999–2008) and US-only, so results may not generalise to current patients or other hospitals.
-- `class_weight="balanced"` changes the probability scale: baseline scores rank patients but are not calibrated probabilities.
+- `class_weight="balanced"` changes the probability scale: the scores of the balanced models rank patients but are not calibrated probabilities.
+- `discharge_disposition_id` is an important variable only known at discharge, so the model cannot be used earlier in the stay.
+- The model misses most early readmissions of patients without prior inpatient visits.
+- The hyperparameter search is small, and the learning curve, weighting comparison and subset results use a configuration chosen with all 5 folds.
 - Some coefficients come from rare categories and should be read carefully.
 - The analysis is retrospective and shows associations, not causes.
 
