@@ -69,3 +69,30 @@ Liste de prompts simples qui suivent les étapes du notebook `week2_data_prepara
 - Comment interpréter un coefficient de régression logistique ?
 - Pourquoi les catégories rares ont-elles des coefficients très grands ?
 - Résume les résultats de la semaine 2 et propose des pistes pour la semaine 3.
+
+# Prompts – Week 3 (Model Development)
+
+Sélection non exhaustive de prompts, reformulés, utilisés pendant l'exécution et la relecture du notebook `week3_model_development.ipynb`.
+
+## 1. Temps de calcul et progression
+
+- La cellule de tuning tourne depuis 50 minutes : pourquoi est-ce si long ?
+- Est-ce que cette cellule affiche bien la progression en direct ?
+- Dois-je relancer la cellule de tuning après un redémarrage du noyau ?
+- Combien de temps vont prendre les sections 4.1, 4.2, 6 et 7 ?
+- Vérifie que la première cellule de la section 6 est correcte et affiche sa progression.
+
+## 2. Débogage
+
+- J'ai l'erreur `NameError: name 'itertools' is not defined` : que se passe-t-il ?
+- À partir de quelle cellule dois-je relancer ?
+- Le tuning de la random forest est fini mais la suite ne se lance pas : pourquoi ?
+
+## 3. Vérification et interprétation
+
+- Vérifie qu'il n'y a pas de data leakage ou d'autre problème dans le notebook.
+- Fais-moi un résumé des résultats et dis-moi s'ils sont bons.
+
+## 4. Rédaction
+
+- Mets à jour le fichier de prompts.
